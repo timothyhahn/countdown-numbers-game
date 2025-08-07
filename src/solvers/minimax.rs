@@ -75,7 +75,7 @@ impl MinimaxSolver {
         for &num in numbers {
             initial_equations.insert(num, Equation::terminate(num));
         }
-        
+
         let initial_state = GameState {
             numbers: numbers.to_vec(),
             equations: initial_equations,
@@ -139,26 +139,28 @@ impl MinimaxSolver {
         if state.numbers.len() <= 1 {
             return true;
         }
-        
+
         // Check if any equation equals target
         for &num in &state.numbers {
             if let Some(eq) = state.equations.get(&num)
                 && let Ok(result) = eq.solve()
-                && result == self.target {
+                && result == self.target
+            {
                 return true;
             }
         }
-        
+
         false
     }
 
     fn utility(&self, state: &GameState) -> i32 {
         let mut best_utility = i32::MIN / 2;
-        
+
         // Check all equations/numbers in the current state
         for &num in &state.numbers {
             if let Some(eq) = state.equations.get(&num)
-                && let Ok(result) = eq.solve() {
+                && let Ok(result) = eq.solve()
+            {
                 if result == self.target {
                     return EXACT_MATCH_UTILITY; // Exact match, return high reward
                 }
@@ -249,23 +251,29 @@ impl MinimaxSolver {
 
         // Create new equations map, copying existing ones
         let mut new_equations = state.equations.clone();
-        
+
         // Remove the used equations
         new_equations.remove(&action.a);
         new_equations.remove(&action.b);
 
         // Get the equations for a and b
-        let eq_a = state.equations.get(&action.a).cloned()
+        let eq_a = state
+            .equations
+            .get(&action.a)
+            .cloned()
             .unwrap_or_else(|| Equation::terminate(action.a));
-        let eq_b = state.equations.get(&action.b).cloned()
+        let eq_b = state
+            .equations
+            .get(&action.b)
+            .cloned()
             .unwrap_or_else(|| Equation::terminate(action.b));
 
         // For equation building, we need to construct: eq_a op eq_b
         // But the equation structure expects: number op equation
         // So we build it as: eq_a.solve() op eq_b (if eq_a is simple) or reconstruct properly
-        
+
         let combined_equation = if matches!(eq_a.operation, Operation::Terminate) {
-            // Simple case: a op eq_b  
+            // Simple case: a op eq_b
             let operation = match action.op_type {
                 OpType::Add => Operation::add(eq_b),
                 OpType::Subtract => Operation::subtract(eq_b),
@@ -278,21 +286,26 @@ impl MinimaxSolver {
             // This is tricky with current equation structure - for now use a simpler approach
             let operation = match action.op_type {
                 OpType::Add => Operation::add(eq_b),
-                OpType::Subtract => Operation::subtract(eq_b),  
+                OpType::Subtract => Operation::subtract(eq_b),
                 OpType::Multiply => Operation::multiply(eq_b),
                 OpType::Divide => Operation::divide(eq_b),
             };
-            Equation::new(eq_a.number, match eq_a.operation {
-                Operation::Op(op_type, inner) => {
-                    match op_type {
+            Equation::new(
+                eq_a.number,
+                match eq_a.operation {
+                    Operation::Op(op_type, inner) => match op_type {
                         OpType::Add => Operation::add(Equation::new(inner.number, operation)),
-                        OpType::Subtract => Operation::subtract(Equation::new(inner.number, operation)),
-                        OpType::Multiply => Operation::multiply(Equation::new(inner.number, operation)),
+                        OpType::Subtract => {
+                            Operation::subtract(Equation::new(inner.number, operation))
+                        }
+                        OpType::Multiply => {
+                            Operation::multiply(Equation::new(inner.number, operation))
+                        }
                         OpType::Divide => Operation::divide(Equation::new(inner.number, operation)),
-                    }
-                }
-                Operation::Terminate => operation,
-            })
+                    },
+                    Operation::Terminate => operation,
+                },
+            )
         };
 
         // Add the new equation for the result
@@ -448,10 +461,14 @@ mod tests {
             "Minimax nodes explored for target 999: {}",
             solver.nodes_explored
         );
-        
+
         if let Some(equation) = result {
             let value = equation.solve().unwrap_or(0);
-            println!("Minimax found approximation: {} = {}", equation.format(), value);
+            println!(
+                "Minimax found approximation: {} = {}",
+                equation.format(),
+                value
+            );
             assert_ne!(value, 999);
             assert!(value > 0);
         }

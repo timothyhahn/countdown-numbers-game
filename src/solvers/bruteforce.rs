@@ -34,15 +34,15 @@ impl BruteForceSolver {
         for &num in numbers.iter() {
             equations.insert(num, Equation::terminate(num));
         }
-        
+
         self.try_all_combinations_with_equations(target, numbers.to_owned(), equations)
     }
 
     fn try_all_combinations_with_equations(
-        &mut self, 
-        target: i32, 
+        &mut self,
+        target: i32,
         numbers: Vec<i32>,
-        equations: std::collections::HashMap<i32, Equation>
+        equations: std::collections::HashMap<i32, Equation>,
     ) -> Option<Equation> {
         self.permutation_count += 1;
 
@@ -52,9 +52,10 @@ impl BruteForceSolver {
                 let equation = equations.get(&numbers[0]).cloned()?;
                 // Double-check that the equation actually evaluates to the target
                 if let Ok(result) = equation.solve()
-                    && result == target {
-                        return Some(equation);
-                    }
+                    && result == target
+                {
+                    return Some(equation);
+                }
             }
             return None;
         }
@@ -77,7 +78,7 @@ impl BruteForceSolver {
                 ];
 
                 let mut all_ops = operations_to_try.to_vec();
-                
+
                 // Add division if valid
                 if b != 0 && a % b == 0 {
                     all_ops.push((OpType::Divide, a / b));
@@ -108,8 +109,14 @@ impl BruteForceSolver {
                     new_equations.remove(&b);
 
                     // Get equations for a and b
-                    let eq_a = equations.get(&a).cloned().unwrap_or_else(|| Equation::terminate(a));
-                    let eq_b = equations.get(&b).cloned().unwrap_or_else(|| Equation::terminate(b));
+                    let eq_a = equations
+                        .get(&a)
+                        .cloned()
+                        .unwrap_or_else(|| Equation::terminate(a));
+                    let eq_b = equations
+                        .get(&b)
+                        .cloned()
+                        .unwrap_or_else(|| Equation::terminate(b));
 
                     // Create combined equation: eq_a op eq_b
                     let operation = match op_type {
@@ -118,9 +125,9 @@ impl BruteForceSolver {
                         OpType::Multiply => Operation::multiply(eq_b),
                         OpType::Divide => Operation::divide(eq_b),
                     };
-                    
+
                     let combined_equation = Equation::new(eq_a.number, operation);
-                    
+
                     // Validate that the equation evaluates to the expected result
                     if let Ok(eq_result) = combined_equation.solve() {
                         if eq_result != result {
@@ -133,7 +140,9 @@ impl BruteForceSolver {
                     new_equations.insert(result, combined_equation);
 
                     // Recursively solve with new numbers and equations
-                    if let Some(solution) = self.try_all_combinations_with_equations(target, new_numbers, new_equations) {
+                    if let Some(solution) =
+                        self.try_all_combinations_with_equations(target, new_numbers, new_equations)
+                    {
                         return Some(solution);
                     }
                 }
@@ -142,7 +151,6 @@ impl BruteForceSolver {
 
         None
     }
-
 }
 
 #[cfg(test)]
