@@ -186,4 +186,5 @@ mod tests {
         );
         assert_eq!(eq.solve(), Err(SolverError::DivisionByZero));
     }
+
 }

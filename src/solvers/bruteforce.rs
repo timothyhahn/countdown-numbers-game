@@ -28,117 +28,121 @@ impl BruteForceSolver {
         self.solve_recursive(target, &mut numbers_vec)
     }
 
-    fn solve_recursive(&mut self, target: i32, numbers: &mut Vec<i32>) -> Option<Equation> {
-        self.generate_permutations(numbers, 0, target)
+    fn solve_recursive(&mut self, target: i32, numbers: &mut [i32]) -> Option<Equation> {
+        // Use a hashmap to track which numbers map to which equations
+        let mut equations = std::collections::HashMap::new();
+        for &num in numbers.iter() {
+            equations.insert(num, Equation::terminate(num));
+        }
+        
+        self.try_all_combinations_with_equations(target, numbers.to_owned(), equations)
     }
 
-    fn generate_permutations(
-        &mut self,
-        numbers: &mut Vec<i32>,
-        start: usize,
-        target: i32,
+    fn try_all_combinations_with_equations(
+        &mut self, 
+        target: i32, 
+        numbers: Vec<i32>,
+        equations: std::collections::HashMap<i32, Equation>
     ) -> Option<Equation> {
-        if start == numbers.len() {
-            // Try this permutation with all possible operation combinations
-            return self.try_all_operations(numbers, target);
-        }
-
-        // Try each number in the remaining positions
-        for i in start..numbers.len() {
-            numbers.swap(start, i);
-            if let Some(result) = self.generate_permutations(numbers, start + 1, target) {
-                return Some(result);
-            }
-            numbers.swap(start, i); // backtrack
-        }
-
-        None
-    }
-
-    fn try_all_operations(&mut self, numbers: &[i32], target: i32) -> Option<Equation> {
         self.permutation_count += 1;
 
+        // Base case: single number
         if numbers.len() == 1 {
-            return if numbers[0] == target {
-                Some(Equation::terminate(numbers[0]))
-            } else {
-                None
-            };
-        }
-
-        let num_ops = numbers.len() - 1;
-        let total_combinations = 4_usize.pow(num_ops as u32);
-
-        for combo in 0..total_combinations {
-            if let Some(equation) = self.build_equation_chain(numbers, combo, target) {
-                return Some(equation);
+            if numbers[0] == target {
+                let equation = equations.get(&numbers[0]).cloned()?;
+                // Double-check that the equation actually evaluates to the target
+                if let Ok(result) = equation.solve()
+                    && result == target {
+                        return Some(equation);
+                    }
             }
-        }
-
-        None
-    }
-
-    fn build_equation_chain(
-        &mut self,
-        numbers: &[i32],
-        op_combo: usize,
-        target: i32,
-    ) -> Option<Equation> {
-        if numbers.len() < 2 {
             return None;
         }
 
-        let mut operations = Vec::new();
-        let mut combo = op_combo;
+        // Try combining every pair of numbers with every operation
+        for i in 0..numbers.len() {
+            for j in 0..numbers.len() {
+                if i == j {
+                    continue;
+                }
 
-        for _ in 0..(numbers.len() - 1) {
-            let op = match combo % 4 {
-                0 => OpType::Add,
-                1 => OpType::Subtract,
-                2 => OpType::Multiply,
-                3 => OpType::Divide,
-                _ => unreachable!(),
-            };
-            operations.push(op);
-            combo /= 4;
-        }
+                let a = numbers[i];
+                let b = numbers[j];
 
-        let mut current_eq = Equation::terminate(numbers[numbers.len() - 1]);
+                // Try all operations
+                let operations_to_try = [
+                    (OpType::Add, a + b),
+                    (OpType::Subtract, a - b),
+                    (OpType::Multiply, a * b),
+                ];
 
-        for i in (0..numbers.len() - 1).rev() {
-            let op_type = operations[i];
-            let left_val = numbers[i];
+                let mut all_ops = operations_to_try.to_vec();
+                
+                // Add division if valid
+                if b != 0 && a % b == 0 {
+                    all_ops.push((OpType::Divide, a / b));
+                }
 
-            if op_type == OpType::Divide {
-                // For division, we need to check if it results in an integer
-                if let Ok(current_val) = current_eq.solve() {
-                    if current_val == 0 || left_val % current_val != 0 {
-                        return None; // Invalid division
+                for (op_type, result) in all_ops {
+                    // Create new numbers array with the result replacing a and b
+                    let mut new_numbers = Vec::new();
+                    let mut used_i = false;
+                    let mut used_j = false;
+
+                    for (idx, &num) in numbers.iter().enumerate() {
+                        if idx == i && !used_i {
+                            used_i = true;
+                            continue;
+                        }
+                        if idx == j && !used_j {
+                            used_j = true;
+                            continue;
+                        }
+                        new_numbers.push(num);
                     }
-                } else {
-                    return None; // Can't evaluate current equation
+                    new_numbers.push(result);
+
+                    // Create new equations map
+                    let mut new_equations = equations.clone();
+                    new_equations.remove(&a);
+                    new_equations.remove(&b);
+
+                    // Get equations for a and b
+                    let eq_a = equations.get(&a).cloned().unwrap_or_else(|| Equation::terminate(a));
+                    let eq_b = equations.get(&b).cloned().unwrap_or_else(|| Equation::terminate(b));
+
+                    // Create combined equation: eq_a op eq_b
+                    let operation = match op_type {
+                        OpType::Add => Operation::add(eq_b),
+                        OpType::Subtract => Operation::subtract(eq_b),
+                        OpType::Multiply => Operation::multiply(eq_b),
+                        OpType::Divide => Operation::divide(eq_b),
+                    };
+                    
+                    let combined_equation = Equation::new(eq_a.number, operation);
+                    
+                    // Validate that the equation evaluates to the expected result
+                    if let Ok(eq_result) = combined_equation.solve() {
+                        if eq_result != result {
+                            continue; // Skip this combination, equation doesn't match expected result
+                        }
+                    } else {
+                        continue; // Skip invalid equations
+                    }
+
+                    new_equations.insert(result, combined_equation);
+
+                    // Recursively solve with new numbers and equations
+                    if let Some(solution) = self.try_all_combinations_with_equations(target, new_numbers, new_equations) {
+                        return Some(solution);
+                    }
                 }
             }
-
-            let operation = match op_type {
-                OpType::Add => Operation::add(current_eq),
-                OpType::Subtract => Operation::subtract(current_eq),
-                OpType::Multiply => Operation::multiply(current_eq),
-                OpType::Divide => Operation::divide(current_eq),
-            };
-
-            current_eq = Equation::new(left_val, operation);
-        }
-
-        // Success case
-        if let Ok(result) = current_eq.solve()
-            && result == target
-        {
-            return Some(current_eq);
         }
 
         None
     }
+
 }
 
 #[cfg(test)]

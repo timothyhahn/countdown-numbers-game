@@ -77,8 +77,30 @@ fn main() {
                 );
             }
         }
-        (Some(_), None) => println!("  Only brute force found a solution"),
-        (None, Some(_)) => println!("  Only minimax found a solution"),
+        (Some(bf_eq), None) => {
+            let bf_value = bf_eq.solve().unwrap_or(0);
+            if bf_value == puzzle.target {
+                println!("  Only brute force found an exact solution");
+            } else {
+                let diff = (puzzle.target - bf_value).abs();
+                println!(
+                    "  Minimax found no solution, brute force found approximation: {} (diff: {})",
+                    bf_value, diff
+                );
+            }
+        }
+        (None, Some(mm_eq)) => {
+            let mm_value = mm_eq.solve().unwrap_or(0);
+            if mm_value == puzzle.target {
+                println!("  Only minimax found an exact solution");
+            } else {
+                let diff = (puzzle.target - mm_value).abs();
+                println!(
+                    "  Brute force found no solution, minimax found close approximation: {} (diff: {})",
+                    mm_value, diff
+                );
+            }
+        }
         (None, None) => println!("  Neither solver found a solution"),
     }
 
